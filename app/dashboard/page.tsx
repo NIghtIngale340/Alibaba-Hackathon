@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import CalendarTest from "./CalendarTest";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -153,6 +154,9 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Google Calendar Test Component */}
+          <CalendarTest />
 
           <div className="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">

@@ -1,0 +1,371 @@
+/**
+ * Action Delegation Layer - Phase 5
+ * Routes tasks to appropriate agents and manages execution flow
+ */
+
+import { ExtractedEventData } from './email-handler';
+
+export type AgentType = 'calendar' | 'outbound' | 'email' | 'voice';
+
+export interface Task {
+  taskId: string;
+  type: 'create_event' | 'send_email' | 'update_event' | 'delete_event' | 'send_reply';
+  agent: AgentType;
+  data: any;
+  priority: 'urgent' | 'normal' | 'low';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  createdAt: Date;
+  completedAt?: Date;
+  error?: string;
+  result?: any;
+}
+
+export interface DelegationResult {
+  success: boolean;
+  taskId: string;
+  agent: AgentType;
+  result?: any;
+  error?: string;
+  executionTime?: number;
+}
+
+export interface AgentCapability {
+  agent: AgentType;
+  canHandle: (task: Task) => boolean;
+  execute: (task: Task) => Promise<DelegationResult>;
+}
+
+// Task queue (use Redis queue in production)
+const taskQueue = new Map<string, Task>();
+const agentRegistry = new Map<AgentType, AgentCapability>();
+
+/**
+ * Register an agent with its capabilities
+ */
+export function registerAgent(capability: AgentCapability): void {
+  agentRegistry.set(capability.agent, capability);
+  console.log(`Agent registered: ${capability.agent}`);
+}
+
+/**
+ * Create a new task
+ */
+export function createTask(
+  type: Task['type'],
+  data: any,
+  priority: Task['priority'] = 'normal'
+): Task {
+  const taskId = generateTaskId();
+  
+  // Determine which agent should handle this
+  const agent = determineAgent(type);
+  
+  const task: Task = {
+    taskId,
+    type,
+    agent,
+    data,
+    priority,
+    status: 'pending',
+    createdAt: new Date(),
+  };
+  
+  taskQueue.set(taskId, task);
+  return task;
+}
+
+/**
+ * Delegate task to appropriate agent
+ */
+export async function delegateTask(task: Task): Promise<DelegationResult> {
+  const startTime = Date.now();
+  
+  try {
+    // Update task status
+    task.status = 'processing';
+    taskQueue.set(task.taskId, task);
+    
+    // Get the agent capability
+    const capability = agentRegistry.get(task.agent);
+    
+    if (!capability) {
+      throw new Error(`No agent registered for type: ${task.agent}`);
+    }
+    
+    // Verify agent can handle this task
+    if (!capability.canHandle(task)) {
+      throw new Error(`Agent ${task.agent} cannot handle task type: ${task.type}`);
+    }
+    
+    // Execute the task
+    console.log(`Delegating task ${task.taskId} to ${task.agent} agent`);
+    const result = await capability.execute(task);
+    
+    // Update task status
+    task.status = result.success ? 'completed' : 'failed';
+    task.completedAt = new Date();
+    task.result = result.result;
+    task.error = result.error;
+    taskQueue.set(task.taskId, task);
+    
+    const executionTime = Date.now() - startTime;
+    
+    return {
+      ...result,
+      executionTime,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Update task as failed
+    task.status = 'failed';
+    task.completedAt = new Date();
+    task.error = errorMessage;
+    taskQueue.set(task.taskId, task);
+    
+    return {
+      success: false,
+      taskId: task.taskId,
+      agent: task.agent,
+      error: errorMessage,
+      executionTime: Date.now() - startTime,
+    };
+  }
+}
+
+/**
+ * Execute task and handle result
+ */
+export async function executeTask(taskId: string): Promise<DelegationResult> {
+  const task = taskQueue.get(taskId);
+  
+  if (!task) {
+    throw new Error(`Task not found: ${taskId}`);
+  }
+  
+  return await delegateTask(task);
+}
+
+/**
+ * Determine which agent should handle a task type
+ */
+function determineAgent(taskType: Task['type']): AgentType {
+  const agentMap: Record<Task['type'], AgentType> = {
+    'create_event': 'calendar',
+    'update_event': 'calendar',
+    'delete_event': 'calendar',
+    'send_email': 'outbound',
+    'send_reply': 'outbound',
+  };
+  
+  return agentMap[taskType] || 'calendar';
+}
+
+/**
+ * Get task status
+ */
+export function getTaskStatus(taskId: string): Task | undefined {
+  return taskQueue.get(taskId);
+}
+
+/**
+ * Get all pending tasks
+ */
+export function getPendingTasks(): Task[] {
+  return Array.from(taskQueue.values())
+    .filter(task => task.status === 'pending')
+    .sort((a, b) => {
+      // Sort by priority
+      const priorityOrder = { urgent: 0, normal: 1, low: 2 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+}
+
+/**
+ * Process all pending tasks
+ */
+export async function processPendingTasks(): Promise<DelegationResult[]> {
+  const pending = getPendingTasks();
+  const results: DelegationResult[] = [];
+  
+  for (const task of pending) {
+    const result = await delegateTask(task);
+    results.push(result);
+  }
+  
+  return results;
+}
+
+/**
+ * Handle error and recovery
+ */
+export async function handleTaskError(
+  taskId: string,
+  recovery: 'retry' | 'skip' | 'manual'
+): Promise<DelegationResult | null> {
+  const task = taskQueue.get(taskId);
+  
+  if (!task || task.status !== 'failed') {
+    return null;
+  }
+  
+  switch (recovery) {
+    case 'retry':
+      // Reset task and retry
+      task.status = 'pending';
+      task.error = undefined;
+      taskQueue.set(taskId, task);
+      return await delegateTask(task);
+      
+    case 'skip':
+      // Mark as completed but skipped
+      task.status = 'completed';
+      task.result = { skipped: true };
+      taskQueue.set(taskId, task);
+      return {
+        success: true,
+        taskId,
+        agent: task.agent,
+        result: { skipped: true },
+      };
+      
+    case 'manual':
+      // Leave for manual intervention
+      return {
+        success: false,
+        taskId,
+        agent: task.agent,
+        error: 'Awaiting manual intervention',
+      };
+      
+    default:
+      return null;
+  }
+}
+
+/**
+ * Generate unique task ID
+ */
+function generateTaskId(): string {
+  return `task_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Clear completed tasks older than specified minutes
+ */
+export function clearCompletedTasks(olderThanMinutes: number = 60): void {
+  const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+  
+  for (const [taskId, task] of taskQueue.entries()) {
+    if (
+      task.status === 'completed' &&
+      task.completedAt &&
+      task.completedAt < cutoff
+    ) {
+      taskQueue.delete(taskId);
+    }
+  }
+}
+
+// ============================================================================
+// Default Agent Implementations
+// ============================================================================
+
+/**
+ * Calendar Agent Implementation
+ */
+export const calendarAgentCapability: AgentCapability = {
+  agent: 'calendar',
+  
+  canHandle: (task: Task) => {
+    return ['create_event', 'update_event', 'delete_event'].includes(task.type);
+  },
+  
+  execute: async (task: Task): Promise<DelegationResult> => {
+    try {
+      // This will be called by the actual Calendar Agent API
+      // For now, we just validate the data structure
+      
+      if (task.type === 'create_event') {
+        const eventData = task.data as ExtractedEventData;
+        
+        // Validate required fields
+        const required = ['title', 'description', 'date', 'start_time', 'end_time'];
+        for (const field of required) {
+          if (!eventData[field as keyof ExtractedEventData]) {
+            throw new Error(`Missing required field: ${field}`);
+          }
+        }
+        
+        return {
+          success: true,
+          taskId: task.taskId,
+          agent: 'calendar',
+          result: {
+            message: 'Event ready for calendar creation',
+            eventData,
+          },
+        };
+      }
+      
+      return {
+        success: true,
+        taskId: task.taskId,
+        agent: 'calendar',
+        result: { message: 'Task processed' },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        taskId: task.taskId,
+        agent: 'calendar',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+};
+
+/**
+ * Outbound Email Agent Implementation
+ */
+export const outboundAgentCapability: AgentCapability = {
+  agent: 'outbound',
+  
+  canHandle: (task: Task) => {
+    return ['send_email', 'send_reply'].includes(task.type);
+  },
+  
+  execute: async (task: Task): Promise<DelegationResult> => {
+    try {
+      // This will be called by the actual Outbound Agent API
+      // For now, we just validate the data structure
+      
+      const emailData = task.data;
+      
+      if (!emailData.to || !emailData.subject || !emailData.body) {
+        throw new Error('Missing required email fields');
+      }
+      
+      return {
+        success: true,
+        taskId: task.taskId,
+        agent: 'outbound',
+        result: {
+          message: 'Email ready to send',
+          emailData,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        taskId: task.taskId,
+        agent: 'outbound',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+};
+
+// Register default agents
+registerAgent(calendarAgentCapability);
+registerAgent(outboundAgentCapability);
