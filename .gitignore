@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/priority-agent/credentials/credentials.json
+/priority-agent/tokens/*
