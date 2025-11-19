@@ -37,6 +37,16 @@ export async function POST(request: NextRequest) {
     // Create the task
     const task = createTask(type, data, priority || 'normal');
 
+    // If this is an outbound email task, attach the user's OAuth tokens
+    // so the outbound agent can call Gmail API on behalf of the user.
+    if (type === 'send_email' || type === 'send_reply') {
+      // session.accessToken and session.refreshToken come from next-auth callbacks
+      (task.data as any)._auth = {
+        accessToken: (session as any).accessToken,
+        refreshToken: (session as any).refreshToken,
+      };
+    }
+
     // Delegate immediately
     const result = await delegateTask(task);
 

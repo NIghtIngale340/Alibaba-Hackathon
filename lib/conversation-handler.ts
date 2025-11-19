@@ -20,7 +20,7 @@ export interface ConversationTurn {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  action?: 'clarify' | 'confirm' | 'modify' | 'cancel' | 'create';
+  action?: 'clarify' | 'confirm' | 'modify' | 'rename' | 'cancel' | 'create';
 }
 
 export type ConversationState = 
@@ -160,6 +160,11 @@ export async function processConversationInput(
       response = await handleEventModification(sessionId, intent.modifications);
       break;
       
+    case 'rename_event':
+    case 'rename_task':
+      response = await handleRename(sessionId, intent.newTitle);
+      break;
+      
     case 'confirm':
       response = await handleConfirmation(sessionId, true);
       break;
@@ -203,9 +208,11 @@ Partial event data: ${JSON.stringify(context.partialEvent || {})}
 User input: "${userInput}"
 
 Determine the user's intent:
-- "create_event": User wants to create a new event
-- "modify_event": User wants to change existing event details
-- "confirm": User confirms the current event
+- "create_event": User wants to create a new event or task
+- "modify_event": User wants to change existing event/task details (other than title)
+- "rename_event": User wants to rename/change the title of an event
+- "rename_task": User wants to rename/change the title of a task
+- "confirm": User confirms the current event/task
 - "cancel": User wants to cancel
 - "provide_info": User is providing requested information
 
@@ -213,7 +220,8 @@ Return JSON:
 {
   "type": "intent_type",
   "extractedData": { event fields if any },
-  "modifications": { fields to modify if applicable }
+  "modifications": { fields to modify if applicable },
+  "newTitle": "new title string if rename intent"
 }`;
 
   try {
@@ -342,6 +350,41 @@ async function handleEventModification(
 }
 
 /**
+ * Handle rename (title change) for events or tasks
+ */
+async function handleRename(
+  sessionId: string,
+  newTitle: string
+): Promise<ConversationResponse> {
+  const context = getConversation(sessionId)!;
+  
+  const updatedEvent = {
+    ...context.partialEvent,
+    title: newTitle,
+  };
+  
+  updateConversation(sessionId, {
+    partialEvent: updatedEvent,
+    state: 'confirming',
+  });
+  
+  const itemType = context.partialEvent?.event_type === 'task' ? 'task' : 'event';
+  const message = getLocalizedMessage(
+    context.language,
+    'renamed',
+    { title: newTitle, type: itemType }
+  );
+  
+  return {
+    message,
+    state: 'confirming',
+    needsUserInput: true,
+    partialEvent: updatedEvent,
+    action: 'rename',
+  };
+}
+
+/**
  * Handle user confirmation
  */
 async function handleConfirmation(
@@ -414,6 +457,7 @@ function getLocalizedMessage(
       confirm_event: (event: any) => 
         `I'll create: "${event.title}" on ${event.date} from ${event.start_time} to ${event.end_time}. Confirm?`,
       event_updated: () => "Event updated. Does this look correct?",
+      renamed: (data: any) => `${data.type === 'task' ? 'Task' : 'Event'} renamed to "${data.title}". Does this look correct?`,
       event_created: "Event created successfully!",
       what_to_change: "What would you like to change?",
       cancelled: "Event creation cancelled.",
@@ -424,6 +468,7 @@ function getLocalizedMessage(
       confirm_event: (event: any) => 
         `我将创建："${event.title}"，时间：${event.date} ${event.start_time} 到 ${event.end_time}。确认吗？`,
       event_updated: () => "事件已更新。看起来正确吗？",
+      renamed: (data: any) => `${data.type === 'task' ? '任务' : '事件'}已重命名为"${data.title}"。看起来正确吗？`,
       event_created: "事件创建成功！",
       what_to_change: "您想修改什么？",
       cancelled: "事件创建已取消。",

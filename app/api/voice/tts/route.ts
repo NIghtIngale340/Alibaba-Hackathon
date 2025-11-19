@@ -9,9 +9,11 @@ import { generateVoiceResponse } from "@/lib/voice-handler";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Allow demo mode without authentication
     const session = await getServerSession(authOptions);
+    const isDemoMode = request.headers.get('x-demo-mode') === 'true';
 
-    if (!session) {
+    if (!session && !isDemoMode) {
       return NextResponse.json(
         { error: "Unauthorized - Please sign in" },
         { status: 401 }
@@ -28,13 +30,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate voice response
-    const result = await generateVoiceResponse(text, language || 'en-US');
+    console.log(`TTS: Generating speech in ${language || 'en-US'}:`, text);
 
+    // For demo mode or when DashScope is not available, return a flag to use Web Speech API
+    // In production, this would call DashScope TTS API and return audio blob
     return NextResponse.json({
-      success: result.success,
-      text: result.text,
-      language: result.language,
+      success: true,
+      text: text,
+      language: language || 'en-US',
+      useWebSpeech: true, // Signal to client to use Web Speech API fallback
+      voiceSettings: {
+        rate: 0.95,
+        pitch: 1.1,
+        volume: 1.0,
+      },
+      message: 'Using browser TTS - DashScope integration pending'
     });
   } catch (error) {
     console.error("TTS error:", error);

@@ -41,9 +41,12 @@ export const authOptions: NextAuthOptions = {
             "openid",
             "email",
             "profile",
+            // Allow reading Gmail and sending messages
             "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.send",
             "https://www.googleapis.com/auth/calendar",
             "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/tasks",
           ].join(" "),
           access_type: "offline",
           prompt: "consent",

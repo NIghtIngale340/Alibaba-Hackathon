@@ -39,27 +39,42 @@ Your Responsibilities:
    - Voice transcriptions
    - Multi-turn conversation data
    
-2. Determine if it contains information about:
-   - A meeting
-   - A call
-   - An appointment
-   - A deadline
-   - A reminder
-   - Any scheduled event
+2. CRITICAL: Distinguish between TASKS and EVENTS:
+   
+   TASKS (use event_type: 'task'):
+   - Action items to be completed
+   - To-dos with deadlines
+   - Reminders without specific meeting times
+   - Activities that don't involve multiple people or locations
+   - Examples: "Finish report", "Submit proposal", "Review document", "Call John"
+   - For tasks: set start_time to deadline and end_time to 15 minutes after
+   
+   EVENTS (use event_type: 'meeting', 'call', 'appointment', or 'event'):
+   - Scheduled meetings with specific times
+   - Appointments with time ranges
+   - Calls scheduled at specific times with others
+   - Events happening at a location or with attendees
+   - Examples: "Team meeting at 2pm", "Doctor appointment", "Conference call"
+   - For events: use actual start and end times
 
-3. Extract all relevant event details:
+3. Extract all relevant details:
    - title (required)
    - description (required)
+   - event_type (required: 'task', 'meeting', 'call', 'appointment', or 'event')
    - date (required, format: YYYY-MM-DD)
    - start_time (required, ISO 8601 format with timezone)
    - end_time (required, ISO 8601 format with timezone)
-   - location (optional)
+   - location (optional, usually not needed for tasks)
    - attendees (optional, array of email addresses)
 
 4. Validation Rules:
    - Only extract explicit or clearly inferable information
    - No hallucination - stick to provided data
+   - ALWAYS respect user's intent: if they say "create a task", use event_type 'task'
+   - If they say "create an event" or "schedule a meeting", use appropriate event type
+   - For rename/update requests: recognize phrases like "rename this task", "change the title", "update the event name"
    - Infer reasonable defaults:
+     * Tasks: 15 minutes duration from deadline
      * Meetings: 1 hour duration if end time not specified
      * Calls: 30 minutes duration if end time not specified
      * Appointments: 1 hour duration if end time not specified
@@ -76,15 +91,16 @@ Your Responsibilities:
 {
   "create_event": true,
   "event": {
-    "title": "Meeting Title",
+    "title": "Meeting Title or Task Name",
     "description": "Full description",
+    "event_type": "task" or "meeting" or "call" or "appointment" or "event",
     "date": "2025-11-20",
     "start_time": "2025-11-20T14:00:00Z",
     "end_time": "2025-11-20T15:00:00Z",
-    "location": "Conference Room A",
-    "attendees": ["person@example.com"]
+    "location": "Conference Room A" (optional, omit for tasks),
+    "attendees": ["person@example.com"] (optional)
   },
-  "reasoning": "Brief explanation",
+  "reasoning": "Brief explanation (specify if TASK or EVENT)",
   "confidence": 0.95
 }
 
@@ -290,77 +306,3 @@ export function convertToCalendarFormat(event: ExtractedEvent) {
   };
 }
 
-/**
- * Test the agent with sample emails
- */
-export const SAMPLE_EMAILS = {
-  meeting: `Subject: Team Standup - Tomorrow 2 PM
-
-Hi team,
-
-Just a reminder that we have our weekly standup tomorrow at 2:00 PM in Conference Room B.
-
-We'll discuss:
-- Sprint progress
-- Blockers
-- Next week's planning
-
-See you all there!
-
-Best,
-Sarah`,
-
-  call: `Subject: Quick sync on Q4 roadmap
-
-Hey Mark,
-
-Can we hop on a call this Friday at 10 AM? Should only take 30 minutes.
-
-Want to discuss the Q4 roadmap and get your input on priorities.
-
-Let me know if that works!
-
-Thanks,
-Alex`,
-
-  appointment: `Subject: Doctor's Appointment Confirmation
-
-Dear Mark Christian Anub,
-
-This is to confirm your appointment:
-
-Date: November 25, 2025
-Time: 3:00 PM - 3:30 PM
-Location: City Medical Center, 123 Health St
-Doctor: Dr. Johnson
-
-Please arrive 10 minutes early.
-
-Thank you,
-City Medical Center`,
-
-  deadline: `Subject: Project Deadline - Nov 30
-
-Team,
-
-Quick reminder that the Alibaba Hackathon project is due on November 30th, 2025 at 11:59 PM.
-
-Please make sure all code is committed and documentation is complete.
-
-Thanks!`,
-
-  noEvent: `Subject: FYI - New Documentation Available
-
-Hi everyone,
-
-Just wanted to let you know that the new API documentation is now available on the wiki.
-
-Check it out when you have time.
-
-No action needed.
-
-Cheers,
-Tom`,
-};
-
-// Keep SAMPLE_EMAILS for testing purposes only

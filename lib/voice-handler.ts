@@ -25,6 +25,12 @@ export interface TTSResult {
   text: string;
   language: string;
   success: boolean;
+  voiceName?: string; // Specific voice to use
+  voiceSettings?: {
+    rate: number;
+    pitch: number;
+    volume: number;
+  };
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -36,6 +42,28 @@ const SUPPORTED_LANGUAGES = [
   'ja-JP', // Japanese
   'ko-KR', // Korean
 ];
+
+// Recommended voice settings for natural-sounding female voice
+const VOICE_SETTINGS = {
+  'en-US': {
+    preferredVoices: ['Google US English', 'Microsoft Zira', 'Samantha', 'Victoria'],
+    rate: 0.95,      // Slightly slower for clarity
+    pitch: 1.1,      // Slightly higher for pleasant female tone
+    volume: 1.0,
+  },
+  'zh-CN': {
+    preferredVoices: ['Google 普通话（中国大陆）', 'Microsoft Huihui', 'Ting-Ting'],
+    rate: 0.9,
+    pitch: 1.15,
+    volume: 1.0,
+  },
+  default: {
+    preferredVoices: [],
+    rate: 0.95,
+    pitch: 1.1,
+    volume: 1.0,
+  },
+};
 
 /**
  * Speech-to-Text using Alibaba Cloud Speech Recognition
@@ -81,12 +109,20 @@ export async function textToSpeech(
   
   console.log(`TTS: Generating speech in ${language}:`, text);
   
+  // Get voice settings for the language
+  const settings = VOICE_SETTINGS[language as keyof typeof VOICE_SETTINGS] || VOICE_SETTINGS.default;
+  
   // Mock TTS result for demo
   // TODO: Replace with actual Alibaba Cloud API call
   const result: TTSResult = {
     text,
     language,
     success: true,
+    voiceSettings: {
+      rate: settings.rate,
+      pitch: settings.pitch,
+      volume: settings.volume,
+    },
   };
   
   return result;
@@ -116,6 +152,60 @@ export function detectLanguage(text: string): string {
   
   // Default to English
   return 'en-US';
+}
+
+/**
+ * Get the best available voice for the specified language
+ * For use in browser with Web Speech API
+ */
+export function getBestVoice(language: string): { name?: string; settings: any } {
+  const settings = VOICE_SETTINGS[language as keyof typeof VOICE_SETTINGS] || VOICE_SETTINGS.default;
+  
+  // If running in browser, check available voices
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    const voices = window.speechSynthesis.getVoices();
+    
+    // Try to find a preferred female voice
+    for (const preferredName of settings.preferredVoices) {
+      const voice = voices.find(v => 
+        v.name.includes(preferredName) && v.lang.startsWith(language.split('-')[0])
+      );
+      if (voice) {
+        return { 
+          name: voice.name,
+          settings: settings,
+        };
+      }
+    }
+    
+    // Fallback: find any female voice for the language
+    const femaleVoice = voices.find(v => 
+      v.lang.startsWith(language.split('-')[0]) && 
+      (v.name.toLowerCase().includes('female') || 
+       v.name.toLowerCase().includes('woman') ||
+       v.name.toLowerCase().includes('zira') ||
+       v.name.toLowerCase().includes('samantha') ||
+       v.name.toLowerCase().includes('victoria'))
+    );
+    
+    if (femaleVoice) {
+      return {
+        name: femaleVoice.name,
+        settings: settings,
+      };
+    }
+    
+    // Last resort: any voice matching the language
+    const anyVoice = voices.find(v => v.lang.startsWith(language.split('-')[0]));
+    if (anyVoice) {
+      return {
+        name: anyVoice.name,
+        settings: settings,
+      };
+    }
+  }
+  
+  return { settings };
 }
 
 /**

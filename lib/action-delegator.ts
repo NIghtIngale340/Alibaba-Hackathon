@@ -4,6 +4,7 @@
  */
 
 import { ExtractedEventData } from './email-handler';
+import { google } from 'googleapis';
 
 export type AgentType = 'calendar' | 'outbound' | 'email' | 'voice';
 
@@ -345,7 +346,66 @@ export const outboundAgentCapability: AgentCapability = {
       if (!emailData.to || !emailData.subject || !emailData.body) {
         throw new Error('Missing required email fields');
       }
-      
+
+      // If OAuth tokens are attached, attempt to send via Gmail API
+      const auth = emailData._auth;
+
+      if (auth && (auth.accessToken || auth.refreshToken)) {
+        // Build OAuth2 client
+        const oAuth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+
+        oAuth2Client.setCredentials({
+          access_token: auth.accessToken,
+          refresh_token: auth.refreshToken,
+        });
+
+        const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
+
+        // Build raw RFC 2822 message
+        const fromHeader = emailData.from ? `From: ${emailData.from}` : '';
+        const toHeader = `To: ${Array.isArray(emailData.to) ? emailData.to.join(', ') : emailData.to}`;
+        const ccHeader = emailData.cc ? `Cc: ${Array.isArray(emailData.cc) ? emailData.cc.join(', ') : emailData.cc}` : '';
+
+        const messageLines: string[] = [];
+        if (fromHeader) messageLines.push(fromHeader);
+        messageLines.push(toHeader);
+        if (ccHeader) messageLines.push(ccHeader);
+        messageLines.push(`Subject: ${emailData.subject}`);
+        messageLines.push('MIME-Version: 1.0');
+        messageLines.push('Content-Type: text/plain; charset="UTF-8"');
+        messageLines.push('');
+        messageLines.push(emailData.body);
+
+        const raw = Buffer.from(messageLines.join('\r\n'))
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+        // Send the message
+        const sendRes = await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: {
+            raw,
+          },
+        });
+
+        return {
+          success: true,
+          taskId: task.taskId,
+          agent: 'outbound',
+          result: {
+            message: 'Email sent',
+            emailData,
+            sendResponseId: sendRes.data.id,
+          },
+        };
+      }
+
+      // Fallback: only validate and return ready-to-send when no auth provided
       return {
         success: true,
         taskId: task.taskId,

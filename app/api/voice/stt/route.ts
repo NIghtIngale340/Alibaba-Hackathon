@@ -9,9 +9,11 @@ import { processVoiceInput, generateVoiceResponse } from "@/lib/voice-handler";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Allow demo mode without authentication
     const session = await getServerSession(authOptions);
+    const isDemoMode = request.headers.get('x-demo-mode') === 'true';
 
-    if (!session) {
+    if (!session && !isDemoMode) {
       return NextResponse.json(
         { error: "Unauthorized - Please sign in" },
         { status: 401 }

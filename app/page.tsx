@@ -13,10 +13,22 @@ export default function Home() {
           </p>
           <div className="flex justify-center gap-4">
             <Link
+              href="/demo"
+              className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+            >
+              🎯 Live Demo
+            </Link>
+            <Link
               href="/auth/signin"
               className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
             >
               Get Started
+            </Link>
+            <Link
+              href="/test"
+              className="px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+            >
+              Test Agents
             </Link>
             <Link
               href="/dashboard"

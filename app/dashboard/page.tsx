@@ -2,8 +2,8 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect } from "react";
-import CalendarTest from "./CalendarTest";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -44,6 +44,12 @@ export default function Dashboard() {
               <span className="text-sm text-gray-700 dark:text-gray-300">
                 {session.user?.email}
               </span>
+              <Link
+                href="/demo"
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+              >
+                🎯 Live Demo
+              </Link>
               <button
                 onClick={() => signOut({ callbackUrl: "/auth/signin" })}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all duration-200"
@@ -154,9 +160,6 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
-          {/* Google Calendar Test Component */}
-          <CalendarTest />
 
           <div className="mt-8 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">

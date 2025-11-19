@@ -9,9 +9,12 @@ import { analyzeEmailContent } from "@/lib/email-handler";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Check for demo mode
+    const isDemoMode = request.headers.get('x-demo-mode') === 'true';
+    
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session && !isDemoMode) {
       return NextResponse.json(
         { error: "Unauthorized - Please sign in" },
         { status: 401 }
@@ -19,11 +22,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { emailText, currentDate } = body;
+    // Accept both 'emailText' and 'content' field names
+    const emailText = body.emailText || body.content;
+    const currentDate = body.currentDate;
 
     if (!emailText) {
       return NextResponse.json(
-        { error: "Missing required field: emailText" },
+        { error: "Missing required field: emailText or content" },
         { status: 400 }
       );
     }
@@ -39,10 +44,32 @@ export async function POST(request: NextRequest) {
     // Analyze the email
     const result = await analyzeEmailContent(emailText, qwenApiKey, currentDate);
 
-    return NextResponse.json({
-      success: true,
-      ...result,
-    });
+    // Transform result to match demo page expectations
+    if (result.create_event && result.event) {
+      return NextResponse.json({
+        event_details: {
+          summary: result.event.title,
+          description: result.event.description,
+          start: result.event.start_time,
+          end: result.event.end_time,
+          location: result.event.location || undefined,
+        },
+        confidence: result.confidence || 0.9,
+        reasoning: result.reasoning || 'Event detected in email',
+        event_type: result.event_type || 'meeting',
+        urgency: 'medium' as const,
+        requires_clarification: !result.event.end_time || !result.event.location,
+        clarification_questions: [],
+      });
+    } else {
+      return NextResponse.json({
+        event_details: null,
+        confidence: 0.1,
+        reasoning: result.reasoning || 'No event found in email',
+        event_type: 'none',
+        urgency: 'low' as const,
+      });
+    }
   } catch (error) {
     console.error("Email analysis error:", error);
     return NextResponse.json(
