@@ -1,0 +1,62 @@
+[
+  {
+    "email_id": "19a9d4531e4e7783",
+    "subject": "absence Notification Email",
+    "sender": "Mark Christian <markanub277@gmail.com>",
+    "timestamp": "2025-11-20T01:59:13.935844",
+    "category": "normal",
+    "priority": "low",
+    "confidential_score": 0.27,
+    "body_preview": "*Subject:* Absence Notification \u2013 [Your Name], [Date]\r\n\r\nDear [Manager\u2019s Name],\r\n\r\nI hope you are well. I am writing to inform you that I will be unable to\r\nattend work tomorrow, *[date]*, due to *[br..."
+  },
+  {
+    "email_id": "19a9d4eeebc13b21",
+    "subject": "",
+    "sender": "Mark Christian <markanub277@gmail.com>",
+    "timestamp": "2025-11-20T02:09:51.564860",
+    "category": "normal",
+    "priority": "low",
+    "confidential_score": 0.27,
+    "body_preview": "I hope you are well. I am writing to inform you that I will be unable to\r\nattend work tomorrow, *[date]*, due to *[brief reason\u2014optional]*.\r\n\r\nI have ensured that all pending tasks are up to date, and..."
+  },
+  {
+    "email_id": "19a9d6239df06f40",
+    "subject": "Advance Notice of Planned Absence",
+    "sender": "Mark Christian <markanub277@gmail.com>",
+    "timestamp": "2025-11-20T02:30:59.429105",
+    "category": "normal",
+    "priority": "low",
+    "confidential_score": 0.43,
+    "body_preview": "Dear [Manager\u2019s Name],\r\n\r\nI hope you are doing well. I am writing to provide advance notice that I\r\nwill need to be absent from work tomorrow, *[date]*, due to a personal\r\nmatter that requires my full..."
+  },
+  {
+    "email_id": "19a9d84171a94306",
+    "subject": "",
+    "sender": "Mark Christian <markanub277@gmail.com>",
+    "timestamp": "2025-11-20T03:07:56.120555",
+    "category": "normal",
+    "priority": "low",
+    "confidential_score": 0.73,
+    "body_preview": "Dear Team,\r\n\r\nI hope you are all doing well. I am reaching out to request an urgent\r\nmeeting that needs to take place as soon as possible today. Several\r\ncritical updates have emerged regarding the *P..."
+  },
+  {
+    "email_id": "19a9d86203017a86",
+    "subject": "",
+    "sender": "Mark Christian <markanub277@gmail.com>",
+    "timestamp": "2025-11-20T03:10:18.673986",
+    "category": "normal",
+    "priority": "low",
+    "confidential_score": 0.73,
+    "body_preview": "Dear Team,\r\n\r\nI hope you are all doing well. I am reaching out to request an urgent\r\nmeeting that needs to take place as soon as possible today. Several\r\ncritical updates have emerged regarding the *P..."
+  },
+  {
+    "email_id": "19a9d88a6d19a87a",
+    "subject": "",
+    "sender": "Mark Christian <markanub277@gmail.com>",
+    "timestamp": "2025-11-20T03:12:56.407243",
+    "category": "normal",
+    "priority": "low",
+    "confidential_score": 0.43,
+    "body_preview": "Dear [Manager\u2019s Name],\r\n\r\nI hope you are doing well. I am writing to provide advance notice that I\r\nwill need to be absent from work tomorrow, *[date]*, due to a personal\r\nmatter that requires my full..."
+  }
+]
